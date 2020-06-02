@@ -15,7 +15,7 @@ statement seemingly contradicts itself. This RFC proposes a new
 directive `strict_operators`, which limits the type juggling done by
 operators and makes them throw a `TypeError` for unsupported types.
 
-Making significant changes to the behavior of operators has significant
+Making significant changes to the behavior of operators has severe
 consequences to backward compatibility. Additionally, there is a
 significant group of people who are in favor of the current method of
 type juggling. Following the rationale of [PHP RFC: Scalar Type
@@ -27,24 +27,20 @@ model that suits them best.
 
 ### Mixed type comparison
 
-Mathematics states that "if `(a > b)` and `(b > c)`, then `(a > c)`".
-This statement can be asserted in PHP;
+The meaning of comparison operators changes based on the type of each
+operand. Strings are compared as byte sequence. If one of the operands
+is an integer the operator performs a numeric comparison.
 
-``` php
-if (($a > $b) && ($b > $c)) {
-    assert($a > $c);
-}
-```
-
-This assertion fails when choosing values of different types
+This allows for statements that defy mathematical logic and may be
+experienced as unexpected behavior.
 
 ``` php
 $a = '42';
 $b = 10;
 $c = '9 eur';
 
-if (($a > $b) && ($b > $c)) {
-    assert($a > $c);
+if (($a > $b) && ($b > $c) && ($c > $a)) {
+   // Unexpected
 }
 ```
 
@@ -54,8 +50,20 @@ Non-strict comparison uses a "smart" comparison method that treats
 strings as numbers if they are numeric. The meaning of the operator
 changes based on the value of both operands.
 
-Using the `<=>` operator to order the values of an array can lead to
-different results based on the initial state of the array.
+This can lead to issues when numeric comparison is not expected, for
+example between two hexidecimal values. The hexidecimal value is
+instead interpreted as number with scientific notation.
+
+```
+$red = '990000';
+$purple = '9900e2';
+
+$red == $purple; // true
+```
+
+It may also cause issues with sorting, as the meaning of the
+comparison operators differers based on the operands (similar to mixed
+type comparison).
 
 ``` php
 function sorted(array $arr) {
@@ -85,46 +93,7 @@ $a < $b; // true
 ```
 
 The logic of relational operators other than `==`, `===`, `!=` and `!==`
-has limited practical use. In case both arrays have the same keys (in
-the same order), a side-by-side comparison is done. If the size differs,
-the array with the most elements is always seen as the greatest;
-
-``` php
-[1] < [50]; // true
-[1, 1] < [50]; // false
-```
-
-This is not a proper method to compare the size of the array, as two
-operands of equal size but different values are not equal. Instead,
-`count()` should be used in this case.
-
-If two arrays have the same number of items but not the same keys, the
-`<`, `<=`, `>` and `>=` operators will always return false.
-
-``` php
-[1] < ['bar' => 50]; // false
-[1] > ['bar' => 50]; // false
-```
-
-In case the two arrays have the same number of items and the same keys
-but in a different order, an element by element comparison is done. The
-`>` and `>=` operator is implemented as the inverse of `<` and `<=`.
-This results in walking through the operand that's expected to be the
-smallest.
-
-``` php
-$a = ['x' => 1, 'y' => 22];
-$b = ['y' => 10, 'x' => 15];
-
-$a > $b; // true
-$a < $b; // true
-```
-
-In the statement with the `>` operator, we walk through the elements of
-`$b`, so first comparing `$b['y']` to `$a['y']`. In the statement with
-`<` we walk through the elements of `$a`, so first comparing `$a['x']`
-to `$b['x']`. This results in both statements, while seemingly
-contracting, to evaluate to true.
+has limited practical use.
 
 ### Strict vs non-strict comparison of arrays
 
@@ -164,39 +133,19 @@ function match($value)
 match("foo"); // "none"
 ```
 
-In case both the expression and the condition operands are both numeric
-strings, both are converted to an integer. This can be unexpected;
-
-``` php
-function match($value)
-{
-  switch ($value) {
-    case "1e1":
-      return "1e1";
-      break;
-    case "10":
-      return "10";
-      break;
-    default:
-      throw new Exception("Unexpected value");
-  }
-}
-
-match("10"); // "1e1"
-```
-
-### All combinations
+### Inconsistent behavior
 
 Operators can do any of the following for unsupported operands
 
   - Cast
       - silent
-      - with notice
-      - with warning
-      - causing a catchable error (fatal)
-  - Notice + cast
-  - Warning + cast
-  - Throw Error
+      - notice
+      - warning
+      - catchable error (fatal)
+  - Operator specific (+ cast)
+      - notice
+      - warning
+      - error
   - No operation
 
 Please take a look at this [list of all combinations of operators and
@@ -206,14 +155,13 @@ operands](https://gist.github.com/jasny/bfd711844a8876f8206ed21357e2e2da).
 
 By default, all PHP files are in weak type-checking mode for operators.
 A new `declare()` directive is added, `strict_operators`, which takes
-either `1` or `0`. If `1`, strict type-checking mode is used for
-operators in the the file. If `0`, weak type-checking mode is used.
+either `1` or `0`. If strict type-checking is not enabled, there will be
+no change from the current behaviour of PHP. If strict type-checking is
+enabled, the following stricter rules will be used;
 
-In strict type-checking mode, operators may cast operands to the
-expected type. However:
-
-  - Typecasting is not based on the type of the other operand
-  - Typecasting is not based on the value of any of the operands
+  - Operators may perform type casting, but not type juggling:
+    - Type casting is not based on the type of the other operand
+    - Type casting is not based on the value of any of the operands
   - Operators will throw a `TypeError` for unsupported types
 
 In case an operator can work with several (or all) types, the operands
@@ -221,170 +169,64 @@ need to match as no casting will be done by those operators.
 
 The one exception is that [widening primitive
 conversion](http://docs.oracle.com/javase/specs/jls/se7/html/jls-5.html#jls-5.1.2)
-is allowed for `int` to `float`. This means that parameters that declare
-`float` can also accept `int`.
+is allowed for `int` to `float`. When doing a operation with an `int`
+and a `float`, the `int` will silently casted to a `float`.
 
-``` php
+```
 declare(strict_operators=1);
 
-1.2 + 2; // float(3.2)
-```
+10 + '9 euro';  // TypeError("Unsupported type string for arithmetic operation")
+10 == 'foo';    // TypeError("Unsupported type string for comparion operation")
+'foo' == 'bar'; // TypeError("Unsupported type string for comparion operation")
 
-In this case, we're passing an `int` to a function that accepts `float`.
-The parameter is converted (widened) to float.
+10 + 2.2;       // 12.2
+10 == 10.0;     // true
+```
 
 ### Comparison operators
 
-All comparison operators work with `int`, `float` and `bool` type
-operands. The types of both operands need to match.
+Enabling strict operators does not affect the identical (`===`) and
+not identical (`!==`) operators. Type conversion does not take place
+for these two operators.
 
-Strings, resources, arrays, objects and null only support the `==`,
-`===`, `!=` and `!==` operators.
-
-``` php
-10 > 42;        // false
-3.14 < 42;      // true
-
-"foo" > "bar";  // TypeError("Unsupported type string for comparison operation")
-"foo" > 10;     // TypeError("Operator type mismatch string and int for comparison operation")
-
-"foo" == "bar"; // false
-"foo" == 10;    // TypeError("Operator type mismatch string and int for comparison operation")
-"foo" == null;  // TypeError("Operator type mismatch string and null for comparison operation")
-
-true > false;   // true
-true != 0;      // TypeError("Operator type mismatch bool and int for comparison operation")
-
-[10] > [];      // TypeError("Unsupported type array for comparison operation")
-[10] == [];     // false
-```
-
-The function of the `===` and `!==` operators remains unchanged.
-
-#### Numeric string comparison
-
-Numeric strings are compared the same way as non-numeric strings. To
-compare two numeric strings as numbers, they need to be cast to integers
-or floats.
-
-``` php
-"120" > "99.9";               // TypeError("Unsupported type string for comparison operation")
-(float)"120" > (float)"99.9"; // true
-
-"100" == "1e1";               // false
-(int)"100" == (int)"1e2";     // true
-
-"120" <=> "99.9";             // TypeError("Unsupported type string for comparison operation")
-```
-
-#### Array comparison
-
-All comparison operators on arrays in strict modes will throw a
-`TypeError`. This includes `==`.
-
-Using `==` implies both comparing an array as an unsorted hashmap and
-using type juggling. Allowing `==` for arrays ad disabling type juggling
-makes `strict_operators` change the behavior of the operator.
-
-``` php
-$a = 0;
-$b = "foo";
-$a == $b;     // TypeError("Unsupported type string for comparison operation")
-[$a] == [$b]; // TypeError("Unsupported type array for comparison operation")
-```
-
-The example above returns `true` without strict operators. Resulting in
-`false` could be considered 'correct'. However if `$b` contains the
-string `"0"` resulting in `false` would be an unexpected change in
-behavior.
-
-``` php
-$a = 0;
-$b = "0";
-$a == $b;     // TypeError("Unsupported type string for comparison operation")
-[$a] == [$b]; // TypeError("Unsupported type array for comparison operation")
-```
-
-The alternative of throwing a `TypeError` based on the contents of the
-array goes against the principles of this RFC.
-
-#### Object comparison
-
-Comparing two objects of different classes using the `==` or `!=`
-operator will throw a `TypeError`.
-
-``` php
-class Foo {
-  public $x;
-  
-  public function __construct($x) {
-    $this->x = $x;
-  }
-}
-
-class FooBar extends Foo {}
-
-(new Foo(10)) == (new Foo(10));     // true
-(new Foo(10)) == (new Foo(99));     // false
-(new Foo(10)) === (new Foo(10));    // false
-
-(new Foo(10)) == (new FooBar(11));  // TypeError("Type mismatch Foo object and FooBar object for comparison operation")
-(new Foo(10)) === (new FooBar(11)); // false
-```
-
-Comparing two objects of the same class will with these operators check
-the properties of the objects. By default, properties are compared in a
-similar fashion to the `===` operator. If the property of both objects
-contains an object of the same class, they're compared as using the `==`
-operator.
-
-In the following examples, the `==` results in `false` when
-`strict_operators` is used and `true` otherwise;
-
-``` php
-(new Foo(0)) == (new Foo('foo'));
-(new Foo(10)) == (new Foo('10'));
-(new Foo(null)) === (new Foo(0));
-```
+All other comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`, `<=>`)
+only support `int` or `float` operands when strict operators is enabled.
+When used with a `bool`, `string`, `array`, `object`, or `resource`
+operand, a `TypeError` is thrown.
 
 ### Arithmetic operators
 
-Arithmetic operators will only work with integers and floats. Using
-operands of any other type will result in a `TypeError`.
-
-In strict type-checking mode, the behavior of the operator is not
-determined by the value of the operands. Thus for any string, including
-numeric strings, a `TypeError` is thrown, so strings need to be
-explicitly cast.
+Arithmetic operators only support `int` or `float` operands when strict
+operators is enabled. Attempting to use an unsupported operand throws a
+`TypeError`.
 
 The `+` operator is still available for arrays as union operator,
 requiring both values to be arrays.
 
 ### Incrementing/Decrementing operators
 
-The incrementing/decrementing operators will throw a `TypeError` when
-the operand is a string, boolean, null, array, object, or resource.
-
-The function of these operators for integers and floats remains
-unchanged.
+The incrementing/decrementing operators only support `int` or `float`
+operands when strict operators is enabled. Attempting to use an
+unsupported operand throws a `TypeError`.
 
 ### Bitwise Operators
 
-Bitwise operators expect both parameters to be an integer. The `&`, `|`,
-`^` and `~` operators also accept strings as operands.
+Bitwise operators `&`, `|`, `^`, and `~` support `int` and `string`
+operands when strict operators is enabled. The type of both operands
+need to match. If the operands are of different types or when using
+an unsupported operand, a `TypeError` is thrown.
 
-Using strings for `>>` or `<<`, mixing strings with integers or using
-any other type will throw a `TypeError`.
+The bitwise shift operators `>>` and `<<` only support `int` operands
+when strict operators is enabled. Attempting to use an unsupported
+operand throws a `TypeError`.
 
 ### String Operators
 
-The concatenation operator `.` will throw a `TypeError` if any of the
-operands is a boolean, array or resource. It will also throw a
-`TypeError` if the operand is an object that doesn't implement the
-`__toString()` method.
-
-Integers, floats, null, and objects (with the `__toString()` method) are
-cast to a string.
+The concatenation operator `.` supports `null`, `int`, `float`,
+`string`, and [stringable object](https://wiki.php.net/rfc/stringable)
+operands when strict operators is enabled. If any of the operands is
+a `bool`, `array`, `resource`, or non-stringable object, a `TypeError`
+is thrown.
 
 #### Variable parsing
 
@@ -399,13 +241,9 @@ cast to booleans.
 
 ### Switch control structure
 
-When strict-type checking for operators is enabled, the `switch`
-statement will do a comparison similar to a comparison on arrays; Scalar
-values in the array are compared using both type and value, thus similar
-to the `===` operator. For arrays, the key order does not matter.
-Objects of the same class will be compared similarly to the \`==\`
-operator, while objects of different classes are always seen as not
-equal. It will **never** throw a `TypeError`.
+When strict operators is enabled, the `switch` statement will not
+perform any type conversion. Comparison is done similar to the
+identical (`===`) operator, rather the equal (`==`) operator.
 
 ``` php
 function match($value)
@@ -439,8 +277,7 @@ match("foo");                     // Exception("Unexpected value")
 
 ## Backward Incompatible Changes
 
-Since the strict type-checking for operators is off by default and must
-be explicitly used, it does not break backward-compatibility.
+If 
 
 ## Proposed PHP Version
 

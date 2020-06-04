@@ -137,19 +137,16 @@ match("foo"); // "none"
 
 Operators can do any of the following for unsupported operands
 
-  - Cast
-      - silent
-      - notice
-      - warning
-      - catchable error (fatal)
-  - Operator specific (+ cast)
-      - notice
-      - warning
-      - error
+  - Cast (silent)
+  - Cast with notice / warning
+  - Cast with catchable error (fatal)
+  - Operator specific notice / warning
+  - Operator specific error (fatal)
   - No operation
 
 Please take a look at this [list of all combinations of operators and
 operands](https://gist.github.com/jasny/bfd711844a8876f8206ed21357e2e2da).
+_TODO: run for to PHP8 from master branch_
 
 ## Proposal
 

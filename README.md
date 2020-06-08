@@ -48,6 +48,8 @@ Arithmetic operators will only support `int` or `float` operands. Attempting to 
 
 The `+` operator will still be available for arrays as union operator, requiring both values to be arrays.
 
+TODO - list the arithmetic operators.
+
 ### Incrementing/Decrementing operators
 
 The incrementing/decrementing operators will only support `int` or `float`operands. Attempting to use an
@@ -74,7 +76,7 @@ When used with a `bool`, `string`, `array`, `object`, or `resource`
 operand, a `TypeError` will be thrown.
 
 
-### String Operators
+### String concatenation
 
 The concatenation operator `.` will only support concatenating `null`, `int`, `float`,
 `string`, and [stringable object](https://wiki.php.net/rfc/stringable)
@@ -83,19 +85,28 @@ operands.
 If any of the operands is a `bool`, `array`, `resource`, or non-stringable object, a `TypeError`will be thrown.
 
 
-#### Variable parsing
+#### String interpolation
 
 When a string is specified in double quotes or with heredoc, variables
-are parsed within it. Using the concatenation operator or double-quoted
-string is considered interchangeable
+are parsed within it. The string interpolation is performed with the same rules as for string concatenation.
 
-TODO - this isn't variable parsing. Isn't string interpolation the right name?
+i.e. this code
+
+```php
+echo "He drank some $juice juice.";
+```
+
+has the same rules as using the string concatenation operator.
+
+```php
+echo "He drank some " . $juice . " juice.";
+```
 
 ### Logical Operators
 
 The function of logical operators remains unchanged. All operands will be cast to booleans.
 
-TODO - This entry is not good. Either everything is unchanged, and so nothing more needs to be said, or the second sentence is a description of the change. But having both there is weird. Just 'no changes to logical operators' would be fine, but also which ones they are should be listed.
+TODO - This entry is not good. Either everything is unchanged, and so nothing more needs to be said, or the second sentence is a description of the change. But having both there is weird. Just 'no changes to logical operators' would be fine, but also which ones are the logical operators should be listed.
 
 ### Switch control structure
 

@@ -8,26 +8,148 @@
 
 ## Introduction
 
-PHP performs implicit type conversion for most operators. The rules of
-conversion are complex, depending on the operator as well as on the type
-and value of the operands. This can lead to surprising results, where a
-statement seemingly contradicts itself. This RFC proposes a new
-directive `strict_operators`, which limits the type juggling done by
-operators and makes them throw a `TypeError` for unsupported types.
+The rules PHP uses for type juggling with operators are complex, varying by operator as well as the types and values of the operands.
 
-Making significant changes to the behavior of operators has severe
-consequences to backward compatibility. Additionally, there is a
-significant group of people who are in favor of the current method of
-type juggling. Following the rationale of [PHP RFC: Scalar Type
-Declarations](/rfc/scalar_type_hints_v5); an optional directive ensures
-backward compatibility and allows people to choose the type checking
-model that suits them best.
+This can lead to surprising results, where a logical statement can have an illogical result. See the "Motivating examples" section below for details.
+ 
+This RFC proposes a new directive `strict_operators`, which limits the type juggling done by
+operators to avoid unexpected results.
+
+## Proposal
+
+Add a new  `declare()` directive `strict_operators`, which accepts either `0` or `1` as the value to indicate that the strict_operators mode should be disabled or enabled.
+
+The default value for this directive is 0, i.e. strict_operators not enabled and there will be no change from the current behaviour of PHP i.e. by default, PHP files do not use the new strict_operators rules.
+
+If strict_operators is enabled, the following stricter rules will be used;
+
+  - Operators may perform type casting, but not type juggling:
+    - Type casting is not based on the type of the other operand
+    - Type casting is not based on the value of any of the operands
+  - Operators will throw a `TypeError` for unsupported types
+
+In case an operator can work with several (or all) types, the operands
+need to match as no casting will be done by those operators.
+
+The one exception is that [widening primitive
+conversion](http://docs.oracle.com/javase/specs/jls/se7/html/jls-5.html#jls-5.1.2)
+is allowed for `int` to `float`. When doing a operation with an `int`
+and a `float`, the `int` will silently casted to a `float`.
+
+When the strict_operators directive is enabled, the following rules will be used.
+
+## Details for operands
+
+This section details which types operands support, and what type juggling will be supported (if any) for them.
+
+### Arithmetic operators
+
+Arithmetic operators will only support `int` or `float` operands. Attempting to use an unsupported operand will throw a `TypeError`.
+
+The `+` operator will still be available for arrays as union operator, requiring both values to be arrays.
+
+TODO - list the arithmetic operators.
+
+### Incrementing/Decrementing operators
+
+The incrementing/decrementing operators will only support `int` or `float`operands. Attempting to use an
+unsupported operand will throw a `TypeError`.
+
+### Bitwise Operators
+
+The bitwise operators `&`, `|`, `^`, and `~` will support `int` and `string`
+operands . The type of both operands need to match. If the operands are of different types or when using
+an unsupported operand, a `TypeError` will be thrown.
+
+The bitwise shift operators `>>` and `<<` will only support `int` operands. Attempting to use an unsupported
+operand will throw a `TypeError`.
+
+### Comparison operators
+
+Enabling the strict_operators directive will not affect the identical (`===`) and
+not identical (`!==`) operators.
+
+All other comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`, `<=>`)
+will only support `int` or `float` operands.
+
+When used with a `bool`, `string`, `array`, `object`, or `resource`
+operand, a `TypeError` will be thrown.
+
+
+### String concatenation
+
+The concatenation operator `.` will only support concatenating `null`, `int`, `float`,
+`string`, and [stringable object](https://wiki.php.net/rfc/stringable)
+operands.
+
+If any of the operands is a `bool`, `array`, `resource`, or non-stringable object, a `TypeError`will be thrown.
+
+
+#### String interpolation
+
+When a string is specified in double quotes or with heredoc, variables
+are parsed within it. The string interpolation is performed with the same rules as for string concatenation.
+
+i.e. this code
+
+```php
+echo "He drank some $juice juice.";
+```
+
+has the same rules as using the string concatenation operator.
+
+```php
+echo "He drank some " . $juice . " juice.";
+```
+
+### Logical Operators
+
+The function of logical operators remains unchanged. All operands will be cast to booleans.
+
+TODO - This entry is not good. Either everything is unchanged, and so nothing more needs to be said, or the second sentence is a description of the change. But having both there is weird. Just 'no changes to logical operators' would be fine, but also which ones are the logical operators should be listed.
+
+### Switch control structure
+
+The `switch` statement will not perform any type conversion. Comparison will be done similar to the
+identical (`===`) operator, rather the equal (`==`) operator.
+
+``` php
+function match($value)
+{
+  switch ($value) {
+    case ["foo" => 42, "bar" => 1]:
+      return "foobar";
+      break;
+    case null:
+      return "null";
+      break;
+    case 0:
+      return "zero";
+      break;
+    case "1e1":
+      return "1e1";
+      break;
+    case "10":
+      return "10";
+      break;
+    default:
+      throw new Exception("Unexpected value");
+  }
+}
+
+match(["bar" => 1, "foo" => 42]); // "foobar"
+match(0);                         // "zero"
+match("10");                      // "10"
+match("foo");                     // Exception("Unexpected value")
+```
 
 ## Motivating examples
 
+The following section demonstrates code that is written logical, but has illogical results.
+
 ### Mixed type comparison
 
-The meaning of comparison operators changes based on the type of each
+The meaning of comparison operators currently change based on the type of each
 operand. Strings are compared as byte sequence. If one of the operands
 is an integer the operator performs a numeric comparison.
 
@@ -40,7 +162,7 @@ $b = 10;
 $c = '9 eur';
 
 if (($a > $b) && ($b > $c) && ($c > $a)) {
-   // Unexpected
+   // Unexpected 
 }
 ```
 
@@ -148,133 +270,9 @@ Please take a look at this [list of all combinations of operators and
 operands](https://gist.github.com/jasny/bfd711844a8876f8206ed21357e2e2da).
 _TODO: run for to PHP8 from master branch_
 
-## Proposal
-
-By default, all PHP files are in weak type-checking mode for operators.
-A new `declare()` directive is added, `strict_operators`, which takes
-either `1` or `0`. If strict type-checking is not enabled, there will be
-no change from the current behaviour of PHP. If strict type-checking is
-enabled, the following stricter rules will be used;
-
-  - Operators may perform type casting, but not type juggling:
-    - Type casting is not based on the type of the other operand
-    - Type casting is not based on the value of any of the operands
-  - Operators will throw a `TypeError` for unsupported types
-
-In case an operator can work with several (or all) types, the operands
-need to match as no casting will be done by those operators.
-
-The one exception is that [widening primitive
-conversion](http://docs.oracle.com/javase/specs/jls/se7/html/jls-5.html#jls-5.1.2)
-is allowed for `int` to `float`. When doing a operation with an `int`
-and a `float`, the `int` will silently casted to a `float`.
-
-```
-declare(strict_operators=1);
-
-10 + '9 euro';  // TypeError("Unsupported type string for arithmetic operation")
-10 == 'foo';    // TypeError("Unsupported type string for comparion operation")
-'foo' == 'bar'; // TypeError("Unsupported type string for comparion operation")
-
-10 + 2.2;       // 12.2
-10 == 10.0;     // true
-```
-
-### Comparison operators
-
-Enabling strict operators does not affect the identical (`===`) and
-not identical (`!==`) operators. Type conversion does not take place
-for these two operators.
-
-All other comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`, `<=>`)
-only support `int` or `float` operands when strict operators is enabled.
-When used with a `bool`, `string`, `array`, `object`, or `resource`
-operand, a `TypeError` is thrown.
-
-### Arithmetic operators
-
-Arithmetic operators only support `int` or `float` operands when strict
-operators is enabled. Attempting to use an unsupported operand throws a
-`TypeError`.
-
-The `+` operator is still available for arrays as union operator,
-requiring both values to be arrays.
-
-### Incrementing/Decrementing operators
-
-The incrementing/decrementing operators only support `int` or `float`
-operands when strict operators is enabled. Attempting to use an
-unsupported operand throws a `TypeError`.
-
-### Bitwise Operators
-
-Bitwise operators `&`, `|`, `^`, and `~` support `int` and `string`
-operands when strict operators is enabled. The type of both operands
-need to match. If the operands are of different types or when using
-an unsupported operand, a `TypeError` is thrown.
-
-The bitwise shift operators `>>` and `<<` only support `int` operands
-when strict operators is enabled. Attempting to use an unsupported
-operand throws a `TypeError`.
-
-### String Operators
-
-The concatenation operator `.` supports `null`, `int`, `float`,
-`string`, and [stringable object](https://wiki.php.net/rfc/stringable)
-operands when strict operators is enabled. If any of the operands is
-a `bool`, `array`, `resource`, or non-stringable object, a `TypeError`
-is thrown.
-
-#### Variable parsing
-
-When a string is specified in double quotes or with heredoc, variables
-are parsed within it. Using the concatenation operator or double-quoted
-string is considered interchangeable
-
-### Logical Operators
-
-The function of logical operators remains unchanged. All operands are
-cast to booleans.
-
-### Switch control structure
-
-When strict operators is enabled, the `switch` statement will not
-perform any type conversion. Comparison is done similar to the
-identical (`===`) operator, rather the equal (`==`) operator.
-
-``` php
-function match($value)
-{
-  switch ($value) {
-    case ["foo" => 42, "bar" => 1]:
-      return "foobar";
-      break;
-    case null:
-      return "null";
-      break;
-    case 0:
-      return "zero";
-      break;
-    case "1e1":
-      return "1e1";
-      break;
-    case "10":
-      return "10";
-      break;
-    default:
-      throw new Exception("Unexpected value");
-  }
-}
-
-match(["bar" => 1, "foo" => 42]); // "foobar"
-match(0);                         // "zero"
-match("10");                      // "10"
-match("foo");                     // Exception("Unexpected value")
-```
-
 ## Backward Incompatible Changes
 
-...
+None known. As this RFC proposes a new directive, it should only affect code is new or updated to use the strict_operators directive.
 
 ## Proposed PHP Version
 
@@ -299,10 +297,5 @@ This RFC
 
 ## Proposed Voting Choices
 
-As this is a language change, a 2/3 majority is required.
+Accept the RFC and merge the patch? Yes/No
 
-The vote is a straight Yes/No vote for accepting the RFC and merging the
-patch.
-
-*Note: Voting on v1.0 of this RFC (targeting PHP 7.4) ended
-prematurely.*

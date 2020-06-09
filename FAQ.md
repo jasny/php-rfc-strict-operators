@@ -2,31 +2,63 @@
 
 ### What has been changed since the initial proposal?
 
-  - Comparison operators `>`, `>=`, `<`, `<=` and `<=>` with string
-    operands will throw a `TypeError`. [See
-    motivation.](#why_aren_t_all_comparison_functions_available_for_strings)
-  - Comparison operator `==` on array operands will always throw a
-    `TypeError`.
+  - Comparison operators `==`  `!=`, `>`, `>=`, `<`, `<=` and `<=>` with
+    non-numeric operands will throw a `TypeError`.
   - Variable parsing in strings specified in double quotes and with
     heredoc, is also affected.
   - Concatenation operation (using `.`) on `null` does not throw a
     `TypeError`, but will cast `null` to an empty string.
-  - There is no secondary vote for `switch`. If this RFC is accepted
-    `strict_operators` will apply to `switch`.
 
-### Why does
+### Why does `==` and `!=` only support int and float operands
 
-and \!= throw a TypeError instead of returning false? ==== In other
-dynamically typed languages, like Python and Ruby, the `==` and `!=` do
-a type check and always return `false` in case the type is different.
-Throwing a `TypeError` is more common for statically typed languages
-like Go.
+The main difference between the equal (`==`) and identical (`===`) operator,
+is that `==` doesn't perform type casting. By only disabling type casting
+with strict operators, `==` would be similar to `===` for scalar types.
 
-The RFC tries to limit the cases where the behavior changes, rather than
-that a `TypeError` is thrown, as much as possible. For instance `1 ==
-true` and `null == 0` both evaluate to `true` without strict\_operators.
-Having those statements be `false` based on the directive could lead to
-unseen bugs.
+This RFC tries to avoid behaviorial changes based on the strict operators
+directives.
+
+The `==` and `!=` operators compares two arrays as unsorted hashmaps. This
+is a useful feature. However, it's currently tied in with type juggling.
+Comparing the values of the array with type checking, similar to `===`,
+would significatly change the behavior of an operation based on the
+strict operators directive. Example; `['a' => null] == ['a' => 0]` would
+result in `true` when the strict operators is enabled and `false`
+otherwhise.
+
+The `==` and `!=` operators compares two objects by property. This is tied
+in with type juggling. Similar to arrays, comparing property values with
+`===` would change the behavior of the `==` operation.
+
+Comparing two numeric strings using `==` and `!=` will compare them as
+numbers. Disabling type juggling would change this behavior and make these
+operators the same as `===` and `!===` in this case.
+
+### Why don't comparison operators support strings?
+
+In many other languages, using `==`, `!=`, `<`, `>`, `<=` and `=>` with
+string operands performs an `strcmp` like operation. The `<=>` is even
+described as strcmp as operators. Why do these operators throw an
+exception with string operands when strict\_operators is enabled?
+
+It's common to use these operators when both operands are numeric
+strings. Having these statements return a different value based on the
+directive, could lead to issues, especially when source code is
+copy/pasted from an external codebase.
+
+In case it concerns comparing text, it's better to use
+`Collator::compare()`. For non-collation related strings, like date
+strings, the `strcmp` function should be used.
+
+_Nikita Popov made the following argument:_
+
+> Having `$str1 < $str2` perform a `strcmp()` style
+> comparison under strict\_operators is surprising. I think that overall
+> the use of lexicographical string comparisons is quite rare and should
+> be performed using an explicit `strcmp()` call. More likely than not,
+> writing `$str1 < $str2` is a bug and should generate a `TypeError`. Of
+> course, equality comparisons like `$str1 == $str2` should still work,
+> similar to the distinction you make for arrays.
 
 ### Why does the concatenation operator cast, but arithmetic operators don't?
 
@@ -59,32 +91,6 @@ to explicitly typecast the string to an integer. If it concerns input
 data, for instance from `$_POST`, it's recommended to use the [filter
 functions](https://www.php.net/filter).
 
-### Why aren't all comparison functions available for strings?
-
-In many other languages, using `<`, `>`, `<=` and `=>` with string
-operands performs an `strcmp` like operation. The `<=>` is even
-described as strcmp as operators. Why do these operators throw an
-exception with string operands when strict\_operators is enabled?
-
-It's common to use these operators when both operands are numeric
-strings. Having these statements return a different value based on the
-directive, could lead to issues, especially when source code is
-copy/pasted from an external codebase.
-
-In case it concerns comparing text, it's better to use
-`Collator::compare()`. For non-collation related strings, like date
-strings, the `strcmp` function should be used.
-
-Nikita Popov made the following argument:
-
-\<blockquote\>Having `$str1 < $str2` perform a `strcmp()` style
-comparison under strict\_operators is surprising. I think that overall
-the use of lexicographical string comparisons is quite rare and should
-be performed using an explicit `strcmp()` call. More likely than not,
-writing `$str1 < $str2` is a bug and should generate a `TypeError`. Of
-course, equality comparisons like `$str1 == $str2` should still work,
-similar to the distinction you make for arrays.\</blockquote\>
-
 ### How can arrays be compared as unsorted hashmaps?
 
 Arrays are sorted hashmaps in PHP but used as any type of collection
@@ -105,10 +111,10 @@ that's outside the scope of this RFC.
 
 Nikita Popov made the following argument:
 
-\<blockquote\>String increment seems like a pretty niche use case, and I
-believe that many people find the overflow behavior quite surprising. I
-think it may be better to forbid string increment under
-strict\_operators. \</blockquote\>
+> String increment seems like a pretty niche use case, and I
+> believe that many people find the overflow behavior quite surprising. I
+> think it may be better to forbid string increment under
+> strict\_operators.
 
 ### Are built-in functions affected by strict\_operators?
 
@@ -136,14 +142,10 @@ accepted.
 
 ### Are there cases where a statement doesn't throw a TypeError but yields a different result?
 
-Yes, there are 3 cases where a comparison works differently in strict
-operators mode.
+No, not for operators.
 
-``` 
-  * Two numeric strings will be compared on equality as strings instead of numbers. Comparing two operands of the same type should always work. Under strict operators, the operation is only determined by the type and never by the value. Comparisons like ''"100" == "1e2"'' are unlikely to be intended and will return ''false'' with strict operators.
-  * When comparing two objects no type juggling will be performed. This might result in ''false'' where ''true'' will be the result without strict operators.
-  * With strict operators, the ''case'' in a ''switch'' statement will not do type conversion. It also doesn't compare numeric strings as numbers but as strings.
-```
+If the secorndary vote for strict comparison with `switch` is accepted,
+`switch` can give a different result.
 
 ### Will this directive disable type juggling altogether?
 
@@ -161,6 +163,8 @@ This RFC limits the scope to operators.
 ### Why is switch affected? It's not an operator.
 
 Internally the `case` of a switch is handled as a comparison operator.
-The issues with `case` are therefore similar (or even the same) to those
-of comparison operators. The audience that `strict_operators` caters to,
-likely want to get rid of this behavior completely.
+The issues with `case` are therefore similar to those of comparison
+operators. The audience that `strict_operators` caters to, may want
+to get rid of this behavior completely.
+
+This is determined by a secondary vote.

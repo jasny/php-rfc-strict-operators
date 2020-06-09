@@ -13,17 +13,17 @@
 
 The main difference between the equal (`==`) and identical (`===`) operator,
 is that `==` doesn't perform type casting. By only disabling type casting
-with strict operators, `==` would be similar to `===` for scalar types.
+with strict_operators, `==` would be similar to `===` for scalar types.
 
-This RFC tries to avoid behaviorial changes based on the strict operators
+This RFC tries to avoid behaviorial changes based on the strict_operators
 directives.
 
 The `==` and `!=` operators compares two arrays as unsorted hashmaps. This
 is a useful feature. However, it's currently tied in with type juggling.
 Comparing the values of the array with type checking, similar to `===`,
 would significatly change the behavior of an operation based on the
-strict operators directive. Example; `['a' => null] == ['a' => 0]` would
-result in `true` when the strict operators is enabled and `false`
+strict_operators directive. Example; `['a' => null] == ['a' => 0]` would
+result in `true` when the strict_operators is enabled and `false`
 otherwhise.
 
 The `==` and `!=` operators compares two objects by property. This is tied
@@ -84,7 +84,7 @@ case of an error or when no result can be returned. This is different
 from the function returning an empty string or `0`.
 [`strpos`](https://php.net/strpos) is a well-known example.
 
-### Will comparing a number to a numeric string work with strict operators?
+### Will comparing a number to a numeric string work with strict_operators?
 
 No, this will throw a `TypeError`. Users that use string operators need
 to explicitly typecast the string to an integer. If it concerns input
@@ -101,7 +101,7 @@ like `sort()` and `array_values()`.
 Strict comparison of arrays as unsorted hashmaps currently isn't
 possible and requires sorting the array, prior to comparison.
 
-With `==` unavailable when using `strict_operators`, sorting the array
+With `==` unavailable when using strict_operators, sorting the array
 would be the only option available.
 
 Array functions might be added to compare arrays in different ways. But
@@ -164,7 +164,7 @@ This RFC limits the scope to operators.
 
 Internally the `case` of a switch is handled as a comparison operator.
 The issues with `case` are therefore similar to those of comparison
-operators. The audience that `strict_operators` caters to, may want
+operators. The audience that strict_operators caters to, may want
 to get rid of this behavior completely.
 
 This is determined by a secondary vote.

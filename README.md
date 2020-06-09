@@ -1,7 +1,7 @@
 # PHP RFC: Strict operators directive
 
-  - Version: 1.3
-  - Date: 2020-06-04 (first version: 2019-05-25)
+  - Version: 1.4
+  - Date: 2020-06-09 (first version: 2019-05-25)
   - Author: Arnold Daniels, jasny@php.net
   - Status: Under Discussion
   - First Published at: <http://wiki.php.net/rfc/strict_operators>
@@ -44,15 +44,13 @@ This section details which types operands support, and what type juggling will b
 
 ### Arithmetic operators
 
-Arithmetic operators will only support `int` or `float` operands. Attempting to use an unsupported operand will throw a `TypeError`.
+Arithmetic operators `+`, `-`, `*`, `/`, `%`, and `**` will only support `int` or `float` operands. Attempting to use an unsupported operand will throw a `TypeError`.
 
 The `+` operator will still be available for arrays as union operator, requiring both values to be arrays.
 
-TODO - list the arithmetic operators.
-
 ### Incrementing/Decrementing operators
 
-The incrementing/decrementing operators will only support `int` or `float`operands. Attempting to use an
+The incrementing/decrementing operators `++` and `--` will only support `int` or `float`operands. Attempting to use an
 unsupported operand will throw a `TypeError`.
 
 ### Bitwise Operators
@@ -104,9 +102,11 @@ echo "He drank some " . $juice . " juice.";
 
 ### Logical Operators
 
-The function of logical operators remains unchanged. All operands will be cast to booleans.
+There a no changes to the logical operators `&&`, `||`, `!`, `and`, `or`, and `xor`.
 
-TODO - This entry is not good. Either everything is unchanged, and so nothing more needs to be said, or the second sentence is a description of the change. But having both there is weird. Just 'no changes to logical operators' would be fine, but also which ones are the logical operators should be listed.
+### Ternary / Null Coalescing Operator
+
+There a no changes to the ternary (`?:`) and null coalescing (`??`) operator.
 
 ### Switch control structure
 
@@ -297,5 +297,7 @@ This RFC
 
 ## Proposed Voting Choices
 
-Accept the RFC and merge the patch? Yes/No
+Primary vote: Accept the RFC and merge the patch? Yes/No. Requires a 2/3 majority.
+
+Secondary vote: Should strict_operators affect the switch statement? Yes/No Requires a 50%+1 majority.
 

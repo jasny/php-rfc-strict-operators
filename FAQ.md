@@ -118,12 +118,12 @@ Nikita Popov made the following argument:
 
 ### Are built-in functions affected by strict\_operators?
 
-No. Only operators (including the `case` statement)) in the source file
+No. Only operators (including the `case` statement) in the source file
 that has `declare(strict_operators=1)` are affected. Functions defined
 elsewhere, including functions defined in extensions, are not affected.
 
-Specifically `sort()` and `in_array()` will perform weak comparison as
-usual and require the use of the `$sort_flags` and `$strict` arguments
+Specifically `sort()` and `in_array()` will apply type jugging by default
+and require the use of the `$sort_flags` and `$strict` arguments
 to change the way the values are compared.
 
 ### Can relational operators be allowed for arrays?
